@@ -155,7 +155,9 @@ if st.session_state.recs is not None and not st.session_state.recs.empty:
     if fr.empty:
         st.info("No results after filtering. Loosen the filters in the sidebar.")
     else:
+        fr.index = range(1, len(fr) + 1)
         st.dataframe(fr, use_container_width=True)
+
 
 
 
