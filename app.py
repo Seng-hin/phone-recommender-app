@@ -15,19 +15,26 @@ phones_df["display_name"] = (
 )
 
 # Mapping display_name → original row index
-indices = phones_df["display_name"].reset_index().set_index("display_name")["index"]
+indices = phones_df.reset_index().set_index("display_name")["index"]
 
 def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
     """Return top-n similar phones for a given display_name ('Brand - Model')."""
-    if display_name not in indices:
+    # Resolve display_name -> one row index (handle duplicates gracefully)
+    if display_name not in indices.index:
         return pd.DataFrame()
 
-    idx = int(indices[display_name])
+    idx_match = indices.loc[display_name]  # can be scalar int or a Series of ints
+    if isinstance(idx_match, pd.Series):
+        idx = int(idx_match.iloc[0])       # pick the first occurrence
+    else:
+        idx = int(idx_match)
 
-    # fetch similarity row
+    # safety: ensure within bounds
+    if idx < 0 or idx >= cosine_sim.shape[0]:
+        return pd.DataFrame()
+
     row = cosine_sim[idx]
-    if hasattr(row, "ravel"):
-        row = row.ravel()
+    row = row.ravel() if hasattr(row, "ravel") else row
 
     # sort, skip itself, take top-n
     sim_scores = list(enumerate(row))
@@ -35,8 +42,9 @@ def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
     top = [(i, s) for i, s in sim_scores if i != idx][:n]
     ids = [i for i, _ in top]
 
-    cols = ["Brand", "Model", "Price", "RAM", "Storage", "Screen Size", "Battery Capacity", "main_camera_mp"]
+    cols = ["Brand","Model","Price","RAM","Storage","Screen Size","Battery Capacity","main_camera_mp"]
     return phones_df.iloc[ids][cols].reset_index(drop=True)
+
 
 # ---- UI ----
 choice = st.selectbox("Choose a model", sorted(phones_df["display_name"].unique()))
@@ -49,3 +57,4 @@ if st.button("Find similar"):
 
 # Debug sanity check
 st.caption(f"phones_df: {phones_df.shape} | cosine_sim: {cosine_sim.shape}")
+
