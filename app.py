@@ -1,17 +1,23 @@
 import streamlit as st
 import joblib
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(page_title="Mobile Phone Recommender (CBF)", layout="wide")
 st.title("📱 Mobile Phone Recommender (CBF)")
 
-# ---- load artifacts (already in your repo) ----
+# ---- load artifacts ----
 phones_df = joblib.load("cleaned_phone_data.joblib")
 cosine_sim = joblib.load("cosine_sim.joblib")
 
-# ---- build a unique display key and the index map ----
-phones_df["display_name"] = phones_df["Brand"].astype(str) + " - " + phones_df["Model"].astype(str)
-indices = pd.Series(phones_df.index, index=phones_df["display_name"]).drop_duplicates()
+# ---- build a UNIQUE display name and mapping ----
+phones_df["display_name"] = phones_df["Brand"].astype(str).str.strip() + " - " + phones_df["Model"].astype(str).str.strip()
+
+# Drop duplicate display names, keep the first occurrence so we map to ONE row per label
+phones_df = phones_df.drop_duplicates(subset=["display_name"]).reset_index(drop=True)
+
+# Map display_name -> row index (guaranteed unique now)
+indices = phones_df.reset_index().set_index("display_name")["index"]  # Series: label -> int
 
 def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
     """Return top-n similar phones for a given display_name ('Brand - Model')."""
@@ -19,12 +25,20 @@ def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
     if idx is None:
         return pd.DataFrame()
 
-    idx = int(idx)                          # ensure scalar int
-    row = cosine_sim[idx].ravel()           # 1-D similarity row
+    # ensure scalar int (paranoia guard)
+    if isinstance(idx, (pd.Series, list, tuple)):
+        idx = int(pd.Series(idx).iloc[0])
+    else:
+        idx = int(idx)
+
+    # one row of cosine similarities (1-D)
+    row = cosine_sim[idx]
+    if hasattr(row, "ravel"):
+        row = row.ravel()
+
+    # sort, skip itself, take top-n
     sim_scores = list(enumerate(row))
     sim_scores.sort(key=lambda t: t[1], reverse=True)
-
-    # skip itself and take top-n
     top = [(i, s) for i, s in sim_scores if i != idx][:n]
     ids = [i for i, _ in top]
 
@@ -34,11 +48,11 @@ def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
 # ---- UI ----
 choice = st.selectbox("Choose a model", sorted(phones_df["display_name"].unique()))
 if st.button("Find similar"):
-    try:
-        recs = get_recs(choice, n=10)
-        if recs.empty:
-            st.warning("No recommendations found (index mismatch or single-item brand). Try another model.")
-        else:
-            st.dataframe(recs)
-    except Exception as e:
-        st.exception(e)
+    recs = get_recs(choice, n=10)
+    if recs.empty:
+        st.warning("No recommendations found (duplicate label or index mismatch). Try another model.")
+    else:
+        st.dataframe(recs)
+
+# (optional) quick sanity
+st.caption(f"Rows: {phones_df.shape[0]}  |  Cosine shape: {getattr(cosine_sim, 'shape', None)}")
