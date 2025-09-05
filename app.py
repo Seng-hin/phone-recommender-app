@@ -4,8 +4,8 @@ import streamlit as st, joblib, pandas as pd
 st.set_page_config(page_title="Phone Recommender", layout="wide")
 st.title("📱 Mobile Phone Recommender (CBF)")
 
-phones_df = joblib.load("models/cleaned_phone_data.joblib")
-cosine_sim = joblib.load("models/cosine_sim.joblib")
+phones_df = joblib.load("cleaned_phone_data.joblib")
+cosine_sim = joblib.load("cosine_sim.joblib")
 indices = pd.Series(phones_df.index, index=phones_df["Model"]).drop_duplicates()
 
 def get_recs(model_name, n=10):
@@ -24,3 +24,4 @@ if st.button("Find similar"):
         st.warning("No recommendations found.")
     else:
         st.dataframe(recs)
+
