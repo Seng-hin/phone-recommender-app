@@ -115,27 +115,59 @@ if run:
         else:
             # ---- filters (sidebar) ----
             st.sidebar.header("Filters")
-            # brand
+            
+            # Brand filter
             brands = sorted(recs["Brand"].unique().tolist())
             f_brands = st.sidebar.multiselect("Brand", brands, default=brands)
-
-            # price
+            
+            # Price filter
             pmin, pmax = float(recs["Price"].min()), float(recs["Price"].max())
-            f_price = st.sidebar.slider("Price ($)", pmin, pmax, (pmin, pmax))
-
-            # RAM / Storage (treat as numeric)
+            if pmin == pmax:
+                f_price = (pmin, pmax)
+                st.sidebar.write(f"Price: ${pmin:.2f} (fixed)")
+            else:
+                f_price = st.sidebar.slider("Price ($)", pmin, pmax, (pmin, pmax))
+            
+            # RAM filter
             rmin, rmax = int(recs["RAM"].min()), int(recs["RAM"].max())
+            if rmin == rmax:
+                f_ram = (rmin, rmax)
+                st.sidebar.write(f"RAM: {rmin} GB (fixed)")
+            else:
+                f_ram = st.sidebar.slider("RAM (GB)", rmin, rmax, (rmin, rmax))
+            
+            # Storage filter
             smin, smax = int(recs["Storage"].min()), int(recs["Storage"].max())
-            f_ram = st.sidebar.slider("RAM (GB)", rmin, rmax, (rmin, rmax))
-            f_storage = st.sidebar.slider("Storage (GB)", smin, smax, (smin, smax))
-
-            # Screen / Battery / Camera
+            if smin == smax:
+                f_storage = (smin, smax)
+                st.sidebar.write(f"Storage: {smin} GB (fixed)")
+            else:
+                f_storage = st.sidebar.slider("Storage (GB)", smin, smax, (smin, smax))
+            
+            # Screen size
             scmin, scmax = float(recs["Screen Size"].min()), float(recs["Screen Size"].max())
+            if scmin == scmax:
+                f_screen = (scmin, scmax)
+                st.sidebar.write(f"Screen Size: {scmin:.2f} in (fixed)")
+            else:
+                f_screen = st.sidebar.slider("Screen Size (in)", scmin, scmax, (scmin, scmax))
+            
+            # Battery
             bcmin, bcmax = int(recs["Battery Capacity"].min()), int(recs["Battery Capacity"].max())
+            if bcmin == bcmax:
+                f_batt = (bcmin, bcmax)
+                st.sidebar.write(f"Battery: {bcmin} mAh (fixed)")
+            else:
+                f_batt = st.sidebar.slider("Battery (mAh)", bcmin, bcmax, (bcmin, bcmax))
+            
+            # Camera
             cammin, cammax = float(recs["main_camera_mp"].min()), float(recs["main_camera_mp"].max())
-            f_screen = st.sidebar.slider("Screen Size (in)", scmin, scmax, (scmin, scmax))
-            f_batt   = st.sidebar.slider("Battery (mAh)", bcmin, bcmax, (bcmin, bcmax))
-            f_cam    = st.sidebar.slider("Main Camera (MP, total)", cammin, cammax, (cammin, cammax))
+            if cammin == cammax:
+                f_cam = (cammin, cammax)
+                st.sidebar.write(f"Camera: {cammin:.0f} MP (fixed)")
+            else:
+                f_cam = st.sidebar.slider("Main Camera (MP)", cammin, cammax, (cammin, cammax))
+
 
             # apply filters
             fr = recs[
@@ -156,6 +188,7 @@ if run:
                     fr,
                     use_container_width=True
                 )
+
 
 
 
