@@ -106,4 +106,5 @@ if phones_df is not None:
             else:
                 st.warning("No phones match your filter criteria. Try adjusting the filters in the sidebar!")
         else:
-            st.warning("Could not find any recommendations for the selected phone.")```
+            st.warning("Could not find any recommendations for the selected phone.")
+
