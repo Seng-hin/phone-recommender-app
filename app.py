@@ -50,11 +50,11 @@ def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
 # ---- UI (search + dropdown + filters) ----
 
 # ===================== SMART PICKER + PERSISTENT STATE + FILTERS =====================
+# ===================== SEARCH + AUTO FILTERS (no Apply) =====================
 import difflib
 
-# ---------- helpers ----------
 def ranked_options(query: str, options: list[str], topk: int = 30) -> list[str]:
-    """Rank options by startswith, substring and fuzzy match (case-insensitive)."""
+    """Rank options by startswith, substring and fuzzy similarity (case-insensitive)."""
     if not query:
         return options[:topk]
     q = query.lower().strip()
@@ -70,11 +70,12 @@ def ranked_options(query: str, options: list[str], topk: int = 30) -> list[str]:
     return [opt for _, opt in scored[:topk]]
 
 def safe_slider(label, lo, hi, default=None, step=None, fmt=None, key=None):
-    """Return (lo, hi) even when lo==hi; avoids Streamlit slider crash."""
+    """Return (lo, hi); if lo==hi show a fixed text and return the single value range."""
     if default is None:
         default = (lo, hi)
     if lo == hi:
-        st.sidebar.write(f"{label}: {lo if fmt is None else fmt.format(lo)} (fixed)")
+        shown = f"{lo}" if fmt is None else fmt.format(lo)
+        st.sidebar.write(f"{label}: {shown} (fixed)")
         return (lo, hi)
     return st.sidebar.slider(label, lo, hi, default, step=step, key=key)
 
@@ -83,110 +84,79 @@ if "selected_label" not in st.session_state:
     st.session_state.selected_label = None
 if "recs" not in st.session_state:
     st.session_state.recs = None
-if "filtered" not in st.session_state:
-    st.session_state.filtered = None
 
 all_labels = list(phones_df["display_name"])
 
 st.subheader("Choose a model")
 
 c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
-
 with c1:
     query = st.text_input(
         "Type to search (e.g. `sam` → Samsung). Case-insensitive.",
         value=st.session_state.get("q", ""),
         key="q",
-        placeholder="Search brand/model…"
+        placeholder="Search brand/model…",
     )
 with c2:
     topn = st.number_input("Top-N", min_value=5, max_value=50, value=10, step=1, key="k_topn")
 
-# live suggestions (ranked)
+# live suggestions
 suggestions = ranked_options(query, all_labels, topk=50)
-suggest_choice = st.selectbox(
-    "Matches",
-    options=suggestions if suggestions else ["— no matches —"],
-    index=0 if suggestions else None,
-    disabled=not suggestions,
-    key="suggest_select"
+selected_label_ui = st.selectbox(
+    "Matches", options=suggestions if suggestions else ["— no matches —"],
+    index=0 if suggestions else None, disabled=not suggestions, key="suggest_select"
 )
 
-# browse all — now **wired** to update the selection
-with st.expander("▸ Browse all models"):
-    browse_choice = st.selectbox("All models", options=sorted(all_labels), key="browse_select")
-    if st.button("Use this model", key="use_browse_btn"):
-        st.session_state.selected_label = browse_choice
-        st.session_state.q = ""  # clear search to avoid confusion
-        suggest_choice = browse_choice
-
-# use suggest choice if set
-if suggestions and suggest_choice != "— no matches —":
-    chosen_now = suggest_choice
-else:
-    chosen_now = st.session_state.selected_label  # fallback to previous
-
-# main action
+# run
 if st.button("Find similar", type="primary", key="run_btn"):
-    if chosen_now and chosen_now in all_labels:
-        st.session_state.selected_label = chosen_now
-        st.session_state.recs = get_recs(chosen_now, n=int(st.session_state.k_topn))
-        st.session_state.filtered = None
+    if suggestions and selected_label_ui != "— no matches —":
+        st.session_state.selected_label = selected_label_ui
+        st.session_state.recs = get_recs(selected_label_ui, n=int(topn))
     else:
-        st.warning("Please pick a model from matches or the browser.")
+        st.warning("No matches for your search. Try another keyword.")
 
-# ---------- results + filters (persist across reruns) ----------
+# ---------- results + AUTO filters ----------
 if st.session_state.recs is not None and not st.session_state.recs.empty:
     recs = st.session_state.recs
 
-    # FILTERS in a form so they only apply on submit (prevents instant reruns nuking the view)
-    with st.sidebar.form("filters_form", clear_on_submit=False):
-        st.header("Filters")
+    # sidebar filters (auto-apply each change)
+    st.sidebar.header("Filters")
 
-        # Brand
-        brands = sorted(recs["Brand"].unique().tolist())
-        f_brands = st.multiselect("Brand", brands, default=brands, key="f_brands")
+    brands = sorted(recs["Brand"].unique().tolist())
+    f_brands = st.sidebar.multiselect("Brand", brands, default=brands, key="f_brands")
 
-        # Price
-        pmin, pmax = float(recs["Price"].min()), float(recs["Price"].max())
-        f_price = safe_slider("Price ($)", pmin, pmax, key="f_price")
+    pmin, pmax = float(recs["Price"].min()), float(recs["Price"].max())
+    f_price = safe_slider("Price ($)", pmin, pmax, key="f_price")
 
-        # RAM / Storage
-        rmin, rmax = int(recs["RAM"].min()), int(recs["RAM"].max())
-        smin, smax = int(recs["Storage"].min()), int(recs["Storage"].max())
-        f_ram = safe_slider("RAM (GB)", rmin, rmax, key="f_ram")
-        f_storage = safe_slider("Storage (GB)", smin, smax, key="f_storage")
+    rmin, rmax = int(recs["RAM"].min()), int(recs["RAM"].max())
+    smin, smax = int(recs["Storage"].min()), int(recs["Storage"].max())
+    f_ram = safe_slider("RAM (GB)", rmin, rmax, key="f_ram")
+    f_storage = safe_slider("Storage (GB)", smin, smax, key="f_storage")
 
-        # Screen / Battery / Camera
-        scmin, scmax = float(recs["Screen Size"].min()), float(recs["Screen Size"].max())
-        bcmin, bcmax = int(recs["Battery Capacity"].min()), int(recs["Battery Capacity"].max())
-        cammin, cammax = float(recs["main_camera_mp"].min()), float(recs["main_camera_mp"].max())
-        f_screen = safe_slider("Screen Size (in)", scmin, scmax, key="f_screen")
-        f_batt   = safe_slider("Battery (mAh)", bcmin, bcmax, key="f_batt")
-        f_cam    = safe_slider("Main Camera (MP total)", cammin, cammax, key="f_cam")
+    scmin, scmax = float(recs["Screen Size"].min()), float(recs["Screen Size"].max())
+    bcmin, bcmax = int(recs["Battery Capacity"].min()), int(recs["Battery Capacity"].max())
+    cammin, cammax = float(recs["main_camera_mp"].min()), float(recs["main_camera_mp"].max())
+    f_screen = safe_slider("Screen Size (in)", scmin, scmax, key="f_screen")
+    f_batt   = safe_slider("Battery (mAh)", bcmin, bcmax, key="f_batt")
+    f_cam    = safe_slider("Main Camera (MP total)", cammin, cammax, key="f_cam")
 
-        apply_filters = st.form_submit_button("Apply filters")
-
-    # compute filtered view only when submitted (or reuse last)
-    if apply_filters or st.session_state.filtered is None:
-        fr = recs[
-            (recs["Brand"].isin(st.session_state.f_brands if "f_brands" in st.session_state else brands)) &
-            (recs["Price"].between(*(st.session_state.f_price if "f_price" in st.session_state else (pmin, pmax)))) &
-            (recs["RAM"].between(*(st.session_state.f_ram if "f_ram" in st.session_state else (rmin, rmax)))) &
-            (recs["Storage"].between(*(st.session_state.f_storage if "f_storage" in st.session_state else (smin, smax)))) &
-            (recs["Screen Size"].between(*(st.session_state.f_screen if "f_screen" in st.session_state else (scmin, scmax)))) &
-            (recs["Battery Capacity"].between(*(st.session_state.f_batt if "f_batt" in st.session_state else (bcmin, bcmax)))) &
-            (recs["main_camera_mp"].between(*(st.session_state.f_cam if "f_cam" in st.session_state else (cammin, cammax))))
-        ].reset_index(drop=True)
-        st.session_state.filtered = fr
-    else:
-        fr = st.session_state.filtered
+    # apply immediately (reactive)
+    fr = recs[
+        (recs["Brand"].isin(f_brands)) &
+        (recs["Price"].between(*f_price)) &
+        (recs["RAM"].between(*f_ram)) &
+        (recs["Storage"].between(*f_storage)) &
+        (recs["Screen Size"].between(*f_screen)) &
+        (recs["Battery Capacity"].between(*f_batt)) &
+        (recs["main_camera_mp"].between(*f_cam))
+    ].reset_index(drop=True)
 
     st.success(f"Recommendations for **{st.session_state.selected_label}**")
     if fr.empty:
         st.info("No results after filtering. Loosen the filters in the sidebar.")
     else:
         st.dataframe(fr, use_container_width=True)
+
 
 
 
