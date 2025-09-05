@@ -8,17 +8,20 @@ import pandas as pd
 # Use st.cache_data to load the files only once, making the app faster.
 @st.cache_data
 def load_data():
-    """Loads the saved TF-IDF model data from the 'models' directory."""
+    """Loads the saved TF-IDF model data from the project's root directory."""
     try:
+        # --- THIS BLOCK IS NOW CORRECTED TO MATCH YOUR FILES ---
         # Load the dataframe, the similarity matrix, and create the indices series
-        phones_df = joblib.load('models/cbf_train_df.joblib')
-        cosine_sim = joblib.load('models/cbf_matrix.joblib')
+        phones_df = joblib.load('cleaned_phone_data.joblib')
+        cosine_sim = joblib.load('tfidf_matrix.joblib')
+        # -----------------------------------------------------------
+        
         indices = pd.Series(phones_df.index, index=phones_df['Model'])
         return phones_df, cosine_sim, indices
     except FileNotFoundError:
         st.error(
-            "Model files not found! 😭 Please make sure the 'models' directory "
-            "with 'cbf_train_df.joblib' and 'cbf_matrix.joblib' is in your project folder."
+            "Model files not found! 😭 Please make sure 'cleaned_phone_data.joblib' and "
+            "'tfidf_matrix.joblib' are in the same folder as your app.py."
         )
         return None, None, None
 
@@ -134,3 +137,4 @@ if phones_df is not None and cosine_sim is not None:
             )
         else:
             st.warning("No phones match your filter criteria. Try adjusting the filters in the sidebar!")
+
