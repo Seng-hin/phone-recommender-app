@@ -92,7 +92,7 @@ st.subheader("Choose a model")
 c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
 with c1:
     query = st.text_input(
-        "Type to search (e.g. `sam` → Samsung). Case-insensitive.",
+        "Type to search",
         value=st.session_state.get("q", ""),
         key="q",
         placeholder="Search brand/model…",
@@ -156,6 +156,7 @@ if st.session_state.recs is not None and not st.session_state.recs.empty:
         st.info("No results after filtering. Loosen the filters in the sidebar.")
     else:
         st.dataframe(fr, use_container_width=True)
+
 
 
 
