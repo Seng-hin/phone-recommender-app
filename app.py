@@ -18,7 +18,7 @@ def load_data():
         # Create a mapping from the display name back to the original model name
         display_to_model_map = pd.Series(phones_df.Model.values, index=phones_df.display_name).to_dict()
         
-        indices = pd.Series(phones_df.index, index=phones_df['Model'])
+        indices = pd.Series(phones_df.index, index=phones_df['display_name'])
         return phones_df, cosine_sim, indices, display_to_model_map
     except FileNotFoundError:
         st.error("Model files not found! 😭 Ensure 'cleaned_phone_data.joblib' and 'tfidf_matrix.joblib' are in your GitHub repo.")
@@ -106,5 +106,6 @@ if phones_df is not None:
                 st.warning("No phones match your filter criteria. Try adjusting the filters in the sidebar!")
         else:
             st.warning("Could not find any recommendations for the selected phone.")
+
 
 
