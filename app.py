@@ -30,16 +30,15 @@ phones_df, cosine_sim, indices, display_to_model_map = load_data()
 # ==============================================================================
 #                      RECOMMENDATION FUNCTION
 # ==============================================================================
-def get_content_recommendations(model_name, n=10):
-    """Finds similar phones using the pre-computed cosine similarity matrix."""
-    if model_name not in indices:
-        return pd.DataFrame() 
+def get_content_recommendations(display_name, n=10):
+    if display_name not in indices:
+        return pd.DataFrame()
 
-    idx = indices[model_name]
+    idx = indices[display_name]
     sim_scores = sorted(list(enumerate(cosine_sim[idx])), key=lambda x: x[1], reverse=True)[1:n + 1]
     phone_indices = [i[0] for i in sim_scores]
-    columns_to_show = ['Brand', 'Model', 'Price', 'RAM', 'Storage', 'Screen Size', 'Battery Capacity', 'main_camera_mp']
-    return phones_df[columns_to_show].iloc[phone_indices]
+    return phones_df.iloc[phone_indices]
+
 
 # ==============================================================================
 #                             STREAMLIT UI
@@ -107,4 +106,5 @@ if phones_df is not None:
                 st.warning("No phones match your filter criteria. Try adjusting the filters in the sidebar!")
         else:
             st.warning("Could not find any recommendations for the selected phone.")
+
 
