@@ -2,8 +2,8 @@ import streamlit as st
 import joblib
 import pandas as pd
 
-st.set_page_config(page_title="Mobile Phone Recommender (CBF)", layout="wide")
-st.title("📱 Mobile Phone Recommender (CBF)")
+st.set_page_config(page_title="Mobile Phone Recommender", layout="wide")
+st.title("📱 Mobile Phone Recommender")
 
 # ---- load artifacts ----
 phones_df = joblib.load("cleaned_phone_data.joblib")
@@ -157,6 +157,7 @@ if st.session_state.recs is not None and not st.session_state.recs.empty:
     else:
         fr.index = range(1, len(fr) + 1)
         st.dataframe(fr, use_container_width=True)
+
 
 
 
