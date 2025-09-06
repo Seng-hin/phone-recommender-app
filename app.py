@@ -58,21 +58,26 @@ def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
 # ===================== SEARCH + AUTO FILTERS (no Apply) =====================
 import difflib
 
-def ranked_options(query: str, options: list[str], topk: int = 30) -> list[str]:
+def ranked_options(query: str, options: list, topk: int = 30) -> list[str]:
     """Rank options by startswith, substring and fuzzy similarity (case-insensitive)."""
+    # force options to strings
+    options = [str(opt) for opt in options]
     if not query:
         return options[:topk]
-    q = query.lower().strip()
+    q = str(query).lower().strip()
     scored = []
     for opt in options:
         o = opt.lower()
         score = 0
         if o.startswith(q): score += 3
         if q in o:          score += 2
-        score += difflib.SequenceMatcher(a=q, b=o).ratio()
+        from difflib import SequenceMatcher
+        score += SequenceMatcher(a=q, b=o).ratio()
         scored.append((score, opt))
     scored.sort(key=lambda t: t[0], reverse=True)
-    return [opt for _, opt in scored[:topk]]
+    # dedup while preserving rank
+    return list(dict.fromkeys([opt for _, opt in scored[:topk]]))
+
 
 def safe_slider(label, lo, hi, default=None, step=None, fmt=None, key=None):
     """Return (lo, hi); if lo==hi show a fixed text and return the single value range."""
@@ -96,7 +101,7 @@ label_to_index = (
              .set_index("display_name")["index"]          # Series: label -> int index
 )
 
-all_labels = list(label_to_index)
+all_labels = list(label_to_index.index)
 
 st.subheader("Choose a model")
 
@@ -171,6 +176,7 @@ if st.session_state.recs is not None and not st.session_state.recs.empty:
     else:
         fr.index = range(1, len(fr) + 1)
         st.dataframe(fr, use_container_width=True)
+
 
 
 
