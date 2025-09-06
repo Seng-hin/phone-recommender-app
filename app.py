@@ -18,32 +18,37 @@ phones_df["display_name"] = (
 indices = phones_df.reset_index().set_index("display_name")["index"]
 
 def get_recs(display_name: str, n: int = 10) -> pd.DataFrame:
-    """Return top-n similar phones for a given display_name ('Brand - Model')."""
-    # Resolve display_name -> one row index (handle duplicates gracefully)
-    if display_name not in indices.index:
+    """Return top-n similar phones for a given display_name, with Brand–Model dedup."""
+    # resolve to a single row index using the unique map
+    if display_name not in label_to_index.index:
         return pd.DataFrame()
+    idx = int(label_to_index[display_name])
 
-    idx_match = indices.loc[display_name]  # can be scalar int or a Series of ints
-    if isinstance(idx_match, pd.Series):
-        idx = int(idx_match.iloc[0])       # pick the first occurrence
-    else:
-        idx = int(idx_match)
-
-    # safety: ensure within bounds
-    if idx < 0 or idx >= cosine_sim.shape[0]:
-        return pd.DataFrame()
-
+    # similarity row
     row = cosine_sim[idx]
     row = row.ravel() if hasattr(row, "ravel") else row
 
-    # sort, skip itself, take top-n
+    # sort by similarity (desc)
     sim_scores = list(enumerate(row))
     sim_scores.sort(key=lambda t: t[1], reverse=True)
-    top = [(i, s) for i, s in sim_scores if i != idx][:n]
-    ids = [i for i, _ in top]
+
+    # collect unique Brand–Model only
+    picked_ids, seen_labels = [], set()
+    for i, s in sim_scores:
+        if i == idx:
+            continue
+        label_i = phones_df["display_name"].iat[i]
+        if label_i in seen_labels:
+            continue
+        seen_labels.add(label_i)
+        picked_ids.append(i)
+        if len(picked_ids) == n:
+            break
 
     cols = ["Brand","Model","Price","RAM","Storage","Screen Size","Battery Capacity","main_camera_mp"]
-    return phones_df.iloc[ids][cols].reset_index(drop=True)
+    out = phones_df.iloc[picked_ids][cols].reset_index(drop=True)
+    return out
+
 
 
 # ---- UI ----
@@ -85,7 +90,13 @@ if "selected_label" not in st.session_state:
 if "recs" not in st.session_state:
     st.session_state.recs = None
 
-all_labels = list(phones_df["display_name"])
+label_to_index = (
+    phones_df.reset_index()                               # has 'index' = original row
+             .drop_duplicates(subset=["display_name"])    # pick first occurrence per label
+             .set_index("display_name")["index"]          # Series: label -> int index
+)
+
+all_labels = list(label_to_index)
 
 st.subheader("Choose a model")
 
@@ -111,9 +122,12 @@ selected_label_ui = st.selectbox(
 if st.button("Find similar", type="primary", key="run_btn"):
     if suggestions and selected_label_ui != "— no matches —":
         st.session_state.selected_label = selected_label_ui
+        base_idx = int(label_to_index[selected_label_ui])  # <— single, stable row index
+        # call a version of get_recs that accepts an index (or keep label, see below)
         st.session_state.recs = get_recs(selected_label_ui, n=int(topn))
     else:
         st.warning("No matches for your search. Try another keyword.")
+
 
 # ---------- results + AUTO filters ----------
 if st.session_state.recs is not None and not st.session_state.recs.empty:
@@ -157,6 +171,7 @@ if st.session_state.recs is not None and not st.session_state.recs.empty:
     else:
         fr.index = range(1, len(fr) + 1)
         st.dataframe(fr, use_container_width=True)
+
 
 
 
